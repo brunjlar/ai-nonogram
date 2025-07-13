@@ -344,7 +344,7 @@
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 loadingText.textContent = `AI is designing... (Attempt ${attempt}/${maxRetries})`;
-                const prompt = `Create a ${size}x${size} pixel art image inspired by '${randomWord}'. Key rules: 1. The image must be clear, recognizable, and centered. 2. The image must use the space well. 3. CRITICAL: The resulting nonogram puzzle must have a single, unique solution that can be found with logic, without guessing. 4. Output ONLY a valid JSON 2D array of 1s (black) and 0s (white). The array must be exactly ${size}x${size}. Do not include any other text or markdown.`;
+                const prompt = `Create an interesting and complex ${size}x${size} pixel art image inspired by '${randomWord}'. Key rules: 1. The image must be clear, recognizable, and not have empty rows (at the top or bottom) or columns (at the left or right edge). 2. The image should use the space well. 3. CRITICAL: The resulting nonogram puzzle must have a single, unique solution that can be found with logic, without guessing. 4. Output ONLY a valid JSON 2D array of 1s (black) and 0s (white). The array must be exactly ${size}x${size}. Do not include any other text or markdown.`;
 
                 try {
                     const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };

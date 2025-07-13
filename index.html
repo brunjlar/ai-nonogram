@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Nonogram Puzzle Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        .puzzle-board {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 3px;
+            background-color: #4b5563;
+            border: 2px solid #374151;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .top-left-corner { background-color: #f3f4f6; }
+        .clues-container { display: grid; background-color: #e5e7eb; }
+        .clues-row, .clues-col {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            background-color: #f3f4f6;
+            padding: 4px;
+            min-height: 2.25rem;
+            min-width: 2.25rem;
+        }
+        .clues-row { justify-content: flex-end; }
+        .clues-col { justify-content: flex-end; align-items: flex-end; flex-direction: column; }
+        .clues-col div, .clues-row div { margin: 0 2px; }
+        .game-grid { display: grid; border: 1px solid #6b7280; }
+        .cell {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #d1d5db;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .cell.black { background-color: #1f2937; }
+        .cell.marked::after {
+            content: 'X';
+            color: #ef4444;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+        .game-grid .cell:nth-child(5n) { border-right: 2px solid #9ca3af; }
+        .game-grid .row-wrapper:nth-child(5n) .cell { border-bottom: 2px solid #9ca3af; }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            border-radius: 0.5rem;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <div class="w-full max-w-4xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center mb-4 text-gray-900">AI-Powered Nonogram</h1>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+            <div class="flex items-center gap-2">
+                <button id="ai-generate-btn" class="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+                    Generate with AI
+                </button>
+                <select id="ai-size-select" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <option value="5">5x5</option>
+                    <option value="10" selected>10x10</option>
+                    <option value="15">15x15</option>
+                </select>
+            </div>
+            <div class="flex items-center">
+                <label for="click-mode" class="ml-4 mr-2 font-medium">Click Mode:</label>
+                <select id="click-mode" class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <option value="black">Fill Black</option>
+                    <option value="white">Mark White (X)</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="puzzle-info" class="text-center mb-4 h-6">
+            <span id="puzzle-title" class="font-semibold text-lg text-gray-700">5x5 - Smiley</span>
+        </div>
+
+        <div id="puzzle-board" class="puzzle-board">
+            <div class="top-left-corner"></div>
+            <div id="col-clues-container" class="clues-container"></div>
+            <div id="row-clues-container" class="clues-container"></div>
+            <div id="game-grid" class="game-grid"></div>
+        </div>
+
+        <div class="flex justify-center gap-4 mt-6">
+            <button id="check-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">Check</button>
+            <button id="reset-btn" class="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75">Reset</button>
+        </div>
+    </div>
+
+    <!-- Modal for messages -->
+    <div id="message-modal" class="modal">
+        <div class="modal-content">
+            <p id="modal-text" class="text-lg mb-4"></p>
+            <button id="modal-close-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg">Close</button>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loading-modal" class="modal">
+         <div class="modal-content">
+            <p id="loading-text" class="text-lg mb-4">AI is designing a new puzzle...</p>
+            <div class="loader"></div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- INSPIRATION WORDS FOR AI ---
+        const inspirationWords = [
+            'Apple', 'Boat', 'Cat', 'Dog', 'Elephant', 'Fish', 'Guitar', 'House', 'Ice Cream', 'Jacket', 'Key', 'Lamp', 'Mountain', 'Note', 'Orange', 'Pencil', 'Queen', 'Rocket', 'Star', 'Tree', 'Umbrella', 'Violin', 'Watch', 'Xylophone', 'Yacht', 'Zebra', 'Anchor', 'Balloon', 'Cactus', 'Diamond', 'Eagle', 'Feather', 'Ghost', 'Hammer', 'Island', 'Jellyfish', 'Kite', 'Leaf', 'Moon', 'Needle', 'Octopus', 'Pizza', 'Question Mark', 'Rainbow', 'Scissors', 'Tent', 'Unicorn', 'Volcano', 'Whale', 'Yin Yang', 'Zipper'
+        ];
+
+        // --- PRE-DEFINED PUZZLE (as a fallback) ---
+        const initialPuzzle = {
+            name: '5x5 - Smiley',
+            size: 5,
+            solution: [
+                [0, 1, 1, 1, 0], [1, 0, 1, 0, 1], [1, 0, 0, 0, 1], [1, 0, 1, 0, 1], [0, 1, 1, 1, 0],
+            ]
+        };
+
+        // --- DOM ELEMENTS ---
+        const aiGenerateBtn = document.getElementById('ai-generate-btn');
+        const aiSizeSelect = document.getElementById('ai-size-select');
+        const clickModeSelect = document.getElementById('click-mode');
+        const puzzleTitle = document.getElementById('puzzle-title');
+        const colCluesContainer = document.getElementById('col-clues-container');
+        const rowCluesContainer = document.getElementById('row-clues-container');
+        const gameGrid = document.getElementById('game-grid');
+        const checkBtn = document.getElementById('check-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const modal = document.getElementById('message-modal');
+        const modalText = document.getElementById('modal-text');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const loadingModal = document.getElementById('loading-modal');
+        const loadingText = document.getElementById('loading-text');
+
+        // --- GAME STATE ---
+        let currentPuzzle;
+        let playerGrid;
+        let isMouseDown = false;
+
+        // --- FUNCTIONS ---
+        function generateCluesForLine(line) {
+            const clues = line.join('').split('0').map(run => run.length).filter(len => len > 0);
+            return clues.length > 0 ? clues : [0];
+        }
+
+        function generateAllClues(solution) {
+            const size = solution.length;
+            const rowClues = solution.map(generateCluesForLine);
+            const colClues = [];
+            for (let c = 0; c < size; c++) {
+                const col = solution.map(row => row[c]);
+                colClues.push(generateCluesForLine(col));
+            }
+            return { rows: rowClues, cols: colClues };
+        }
+
+        function renderPuzzle(puzzle) {
+            currentPuzzle = puzzle;
+            const size = puzzle.size;
+            const clues = generateAllClues(puzzle.solution);
+
+            puzzleTitle.textContent = puzzle.name;
+
+            colCluesContainer.innerHTML = '';
+            rowCluesContainer.innerHTML = '';
+            gameGrid.innerHTML = '';
+
+            const gridTemplate = `repeat(${size}, minmax(0, 1fr))`;
+            colCluesContainer.style.gridTemplateColumns = gridTemplate;
+            rowCluesContainer.style.gridTemplateRows = gridTemplate;
+            gameGrid.style.gridTemplateColumns = gridTemplate;
+            gameGrid.style.gridTemplateRows = gridTemplate;
+
+            clues.cols.forEach(clueSet => {
+                const clueCell = document.createElement('div');
+                clueCell.className = 'clues-col';
+                clueSet.forEach(clue => {
+                    const clueNum = document.createElement('div');
+                    clueNum.textContent = clue;
+                    clueCell.appendChild(clueNum);
+                });
+                colCluesContainer.appendChild(clueCell);
+            });
+
+            clues.rows.forEach(clueSet => {
+                const clueCell = document.createElement('div');
+                clueCell.className = 'clues-row';
+                clueSet.forEach(clue => {
+                    const clueNum = document.createElement('div');
+                    clueNum.textContent = clue;
+                    clueCell.appendChild(clueNum);
+                });
+                rowCluesContainer.appendChild(clueCell);
+            });
+
+            playerGrid = Array(size).fill(null).map(() => Array(size).fill(0));
+            for (let r = 0; r < size; r++) {
+                const rowWrapper = document.createElement('div');
+                rowWrapper.className = 'row-wrapper';
+                rowWrapper.style.display = 'contents';
+                gameGrid.appendChild(rowWrapper);
+
+                for (let c = 0; c < size; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    rowWrapper.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCellInteraction(event) {
+            if (!event.target || !event.target.classList.contains('cell')) return;
+
+            const cell = event.target;
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            const mode = clickModeSelect.value;
+
+            if (mode === 'black') {
+                playerGrid[row][col] = playerGrid[row][col] === 1 ? 0 : 1;
+                cell.className = playerGrid[row][col] === 1 ? 'cell black' : 'cell';
+            } else {
+                playerGrid[row][col] = playerGrid[row][col] === 2 ? 0 : 2;
+                cell.className = playerGrid[row][col] === 2 ? 'cell marked' : 'cell';
+            }
+        }
+
+        function checkSolution() {
+            const size = currentPuzzle.size;
+            let isCorrect = true;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const playerIsBlack = playerGrid[r][c] === 1;
+                    const solutionIsBlack = currentPuzzle.solution[r][c] === 1;
+                    if (playerIsBlack !== solutionIsBlack) {
+                        isCorrect = false;
+                        break;
+                    }
+                }
+                if (!isCorrect) break;
+            }
+            showModal(isCorrect ? 'Congratulations! You solved it correctly!' : 'Not quite right. Keep trying!');
+        }
+
+        function resetPuzzle() {
+            renderPuzzle(currentPuzzle);
+        }
+
+        function showModal(message) {
+            modalText.textContent = message;
+            modal.style.display = 'flex';
+        }
+
+        // --- AI PUZZLE GENERATION ---
+        async function generateAIPuzzle() {
+            loadingModal.style.display = 'flex';
+            const randomWord = inspirationWords[Math.floor(Math.random() * inspirationWords.length)];
+            const size = parseInt(aiSizeSelect.value);
+            const maxRetries = 3;
+            const minFillRatio = 0.20; // Require at least 20% of cells to be black
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                loadingText.textContent = `AI is designing... (Attempt ${attempt}/${maxRetries})`;
+
+                // **ULTRA-PRECISE PROMPT**
+                const prompt = `Create a ${size}x${size} pixel art image inspired by '${randomWord}'. Key rules: 1. The image must be clear, recognizable, and centered. 2. The image must use the space well. 3. CRITICAL: The resulting nonogram puzzle must have a single, unique solution that can be found with logic, without guessing. 4. Output ONLY a valid JSON 2D array of 1s (black) and 0s (white). The array must be exactly ${size}x${size}. Do not include any other text or markdown.`;
+
+                try {
+                    let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                    const payload = { contents: chatHistory };
+                    const apiKey = ""; // Handled by environment
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+                    const result = await response.json();
+
+                    if (!result.candidates?.[0]?.content?.parts?.[0]) {
+                        throw new Error("Unexpected API response structure.");
+                    }
+
+                    let text = result.candidates[0].content.parts[0].text;
+                    const jsonMatch = text.match(/\[[\s\S]*\]/);
+                    if (!jsonMatch) throw new Error("No JSON array found in response.");
+
+                    const solution = JSON.parse(jsonMatch[0]);
+
+                    // **QUALITY VALIDATION**
+                    if (!Array.isArray(solution) || solution.length !== size || !solution.every(row => Array.isArray(row) && row.length === size)) {
+                        throw new Error(`Grid is not the correct size. Expected ${size}x${size}.`);
+                    }
+
+                    const blackCells = solution.flat().filter(cell => cell === 1).length;
+                    const totalCells = size * size;
+                    const fillRatio = blackCells / totalCells;
+
+                    if (fillRatio < minFillRatio) {
+                         throw new Error(`Image is too empty (fill ratio: ${Math.round(fillRatio*100)}%). Retrying...`);
+                    }
+
+                    // If we get here, the puzzle is good!
+                    const newPuzzle = {
+                        name: `AI Inspiration: '${randomWord}' (${size}x${size})`,
+                        size: size,
+                        solution: solution
+                    };
+                    renderPuzzle(newPuzzle);
+                    loadingModal.style.display = 'none';
+                    return; // Exit the function successfully
+
+                } catch (error) {
+                    console.error(`Attempt ${attempt} failed:`, error);
+                    if (attempt === maxRetries) {
+                        showModal("Sorry, the AI couldn't create a good puzzle after a few tries. Please try again.");
+                    }
+                }
+            }
+            // This part is reached only if all retries fail
+            loadingModal.style.display = 'none';
+        }
+
+        // --- EVENT LISTENERS ---
+        aiGenerateBtn.addEventListener('click', generateAIPuzzle);
+        checkBtn.addEventListener('click', checkSolution);
+        resetBtn.addEventListener('click', resetPuzzle);
+        modalCloseBtn.addEventListener('click', () => modal.style.display = 'none');
+        window.addEventListener('click', (event) => {
+            if (event.target == modal) modal.style.display = 'none';
+        });
+
+        // Mouse & Touch Events
+        gameGrid.addEventListener('mousedown', (e) => { e.preventDefault(); isMouseDown = true; handleCellInteraction(e); });
+        gameGrid.addEventListener('mouseover', (e) => { if (isMouseDown) handleCellInteraction(e); });
+        document.addEventListener('mouseup', () => isMouseDown = false);
+        gameGrid.addEventListener('touchstart', (e) => { e.preventDefault(); isMouseDown = true; handleCellInteraction(e); }, { passive: false });
+        gameGrid.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isMouseDown) {
+                const touch = e.touches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                handleCellInteraction({ target: element });
+            }
+        }, { passive: false });
+        document.addEventListener('touchend', () => isMouseDown = false);
+
+        // --- INITIALIZATION ---
+        renderPuzzle(initialPuzzle);
+
+    </script>
+</body>
+</html>

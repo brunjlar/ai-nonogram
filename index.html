@@ -76,11 +76,18 @@
             background-color: #fefefe;
             padding: 20px;
             border: 1px solid #888;
-            width: 80%;
-            max-width: 400px;
-            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            text-align: left;
             border-radius: 0.5rem;
+            max-height: 80vh;
+            overflow-y: auto;
         }
+        .modal-content h2 { font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; text-align: center; }
+        .modal-content h3 { font-size: 1.25rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .modal-content p, .modal-content li { margin-bottom: 0.5rem; }
+        .modal-content ul { list-style-position: inside; list-style-type: disc; }
+        .modal-content code { background-color: #e5e7eb; padding: 2px 4px; border-radius: 4px; }
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #3498db;
@@ -99,8 +106,14 @@
 <body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
 
     <div class="w-full max-w-4xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl sm:text-3xl font-bold text-center mb-4 text-gray-900">AI-Powered Nonogram</h1>
+        <div class="flex justify-between items-start">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">AI-Powered Nonogram</h1>
+            <button id="help-btn" class="text-sm text-blue-600 hover:underline">Help</button>
+        </div>
 
+        <div class="border-t my-4"></div>
+
+        <!-- Controls Section -->
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
             <div class="flex items-center gap-2">
                 <button id="ai-generate-btn" class="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 flex items-center justify-center">
@@ -122,7 +135,16 @@
             </div>
         </div>
 
-        <div id="puzzle-info" class="text-center mb-4 h-6">
+        <!-- API Key Section -->
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg border">
+             <label for="api-key-input" class="block text-sm font-medium text-gray-700">Google AI API Key</label>
+             <div class="flex items-center gap-2 mt-1">
+                <input type="password" id="api-key-input" class="flex-grow block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" placeholder="Enter your API key">
+                <button id="save-key-btn" class="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-700">Save</button>
+             </div>
+        </div>
+
+        <div id="puzzle-info" class="text-center my-4 h-6">
             <span id="puzzle-title" class="font-semibold text-lg text-gray-700">5x5 - Smiley</span>
         </div>
 
@@ -139,58 +161,71 @@
         </div>
     </div>
 
-    <!-- Modal for messages -->
+    <footer class="text-center p-4 text-gray-500 text-sm mt-4">
+        Created by
+        <a href="mailto:brunjlar@gmail.com" target="_blank" class="text-blue-600 hover:underline">Lars Brünjes</a>
+        with assistance from Google Gemini.
+        <br>
+        <a href="https://github.com/brunjlar/ai-nonogram" target="_blank" class="text-blue-600 hover:underline">GitHub Repository</a>
+    </footer>
+
+    <!-- Modals -->
     <div id="message-modal" class="modal">
         <div class="modal-content">
-            <p id="modal-text" class="text-lg mb-4"></p>
-            <button id="modal-close-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg">Close</button>
+            <p id="modal-text" class="text-lg mb-4 text-center"></p>
+            <button class="modal-close-btn px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg block mx-auto">Close</button>
         </div>
     </div>
 
-    <!-- Loading Modal -->
     <div id="loading-modal" class="modal">
          <div class="modal-content">
-            <p id="loading-text" class="text-lg mb-4">AI is designing a new puzzle...</p>
+            <p id="loading-text" class="text-lg mb-4 text-center">AI is designing a new puzzle...</p>
             <div class="loader"></div>
+        </div>
+    </div>
+
+    <div id="help-modal" class="modal">
+         <div class="modal-content">
+            <!-- Help content will be injected here by JS -->
+            <div id="help-content"></div>
+            <button class="modal-close-btn px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg block mx-auto mt-4">Close</button>
         </div>
     </div>
 
 
     <script>
         // --- INSPIRATION WORDS FOR AI ---
-        const inspirationWords = [
-            'Apple', 'Boat', 'Cat', 'Dog', 'Elephant', 'Fish', 'Guitar', 'House', 'Ice Cream', 'Jacket', 'Key', 'Lamp', 'Mountain', 'Note', 'Orange', 'Pencil', 'Queen', 'Rocket', 'Star', 'Tree', 'Umbrella', 'Violin', 'Watch', 'Xylophone', 'Yacht', 'Zebra', 'Anchor', 'Balloon', 'Cactus', 'Diamond', 'Eagle', 'Feather', 'Ghost', 'Hammer', 'Island', 'Jellyfish', 'Kite', 'Leaf', 'Moon', 'Needle', 'Octopus', 'Pizza', 'Question Mark', 'Rainbow', 'Scissors', 'Tent', 'Unicorn', 'Volcano', 'Whale', 'Yin Yang', 'Zipper'
-        ];
+        const inspirationWords = [ 'Apple', 'Boat', 'Cat', 'Dog', 'Elephant', 'Fish', 'Guitar', 'House', 'Ice Cream', 'Jacket', 'Key', 'Lamp', 'Mountain', 'Note', 'Orange', 'Pencil', 'Queen', 'Rocket', 'Star', 'Tree', 'Umbrella', 'Violin', 'Watch', 'Xylophone', 'Yacht', 'Zebra', 'Anchor', 'Balloon', 'Cactus', 'Diamond', 'Eagle', 'Feather', 'Ghost', 'Hammer', 'Island', 'Jellyfish', 'Kite', 'Leaf', 'Moon', 'Needle', 'Octopus', 'Pizza', 'Question Mark', 'Rainbow', 'Scissors', 'Tent', 'Unicorn', 'Volcano', 'Whale', 'Yin Yang', 'Zipper' ];
 
         // --- PRE-DEFINED PUZZLE (as a fallback) ---
-        const initialPuzzle = {
-            name: '5x5 - Smiley',
-            size: 5,
-            solution: [
-                [0, 1, 1, 1, 0], [1, 0, 1, 0, 1], [1, 0, 0, 0, 1], [1, 0, 1, 0, 1], [0, 1, 1, 1, 0],
-            ]
-        };
+        const initialPuzzle = { name: '5x5 - Smiley', size: 5, solution: [ [0, 1, 1, 1, 0], [1, 0, 1, 0, 1], [1, 0, 0, 0, 1], [1, 0, 1, 0, 1], [0, 1, 1, 1, 0], ] };
 
         // --- DOM ELEMENTS ---
         const aiGenerateBtn = document.getElementById('ai-generate-btn');
         const aiSizeSelect = document.getElementById('ai-size-select');
         const clickModeSelect = document.getElementById('click-mode');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+        const helpBtn = document.getElementById('help-btn');
         const puzzleTitle = document.getElementById('puzzle-title');
         const colCluesContainer = document.getElementById('col-clues-container');
         const rowCluesContainer = document.getElementById('row-clues-container');
         const gameGrid = document.getElementById('game-grid');
         const checkBtn = document.getElementById('check-btn');
         const resetBtn = document.getElementById('reset-btn');
-        const modal = document.getElementById('message-modal');
+        const messageModal = document.getElementById('message-modal');
         const modalText = document.getElementById('modal-text');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
         const loadingModal = document.getElementById('loading-modal');
         const loadingText = document.getElementById('loading-text');
+        const helpModal = document.getElementById('help-modal');
+        const helpContent = document.getElementById('help-content');
+        const closeButtons = document.querySelectorAll('.modal-close-btn');
 
         // --- GAME STATE ---
         let currentPuzzle;
         let playerGrid;
         let isMouseDown = false;
+        let userApiKey = '';
 
         // --- FUNCTIONS ---
         function generateCluesForLine(line) {
@@ -215,7 +250,6 @@
             const clues = generateAllClues(puzzle.solution);
 
             puzzleTitle.textContent = puzzle.name;
-
             colCluesContainer.innerHTML = '';
             rowCluesContainer.innerHTML = '';
             gameGrid.innerHTML = '';
@@ -229,22 +263,14 @@
             clues.cols.forEach(clueSet => {
                 const clueCell = document.createElement('div');
                 clueCell.className = 'clues-col';
-                clueSet.forEach(clue => {
-                    const clueNum = document.createElement('div');
-                    clueNum.textContent = clue;
-                    clueCell.appendChild(clueNum);
-                });
+                clueSet.forEach(clue => { clueCell.innerHTML += `<div>${clue}</div>`; });
                 colCluesContainer.appendChild(clueCell);
             });
 
             clues.rows.forEach(clueSet => {
                 const clueCell = document.createElement('div');
                 clueCell.className = 'clues-row';
-                clueSet.forEach(clue => {
-                    const clueNum = document.createElement('div');
-                    clueNum.textContent = clue;
-                    clueCell.appendChild(clueNum);
-                });
+                clueSet.forEach(clue => { clueCell.innerHTML += `<div>${clue}</div>`; });
                 rowCluesContainer.appendChild(clueCell);
             });
 
@@ -267,12 +293,10 @@
 
         function handleCellInteraction(event) {
             if (!event.target || !event.target.classList.contains('cell')) return;
-
             const cell = event.target;
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
             const mode = clickModeSelect.value;
-
             if (mode === 'black') {
                 playerGrid[row][col] = playerGrid[row][col] === 1 ? 0 : 1;
                 cell.className = playerGrid[row][col] === 1 ? 'cell black' : 'cell';
@@ -287,9 +311,7 @@
             let isCorrect = true;
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
-                    const playerIsBlack = playerGrid[r][c] === 1;
-                    const solutionIsBlack = currentPuzzle.solution[r][c] === 1;
-                    if (playerIsBlack !== solutionIsBlack) {
+                    if ((playerGrid[r][c] === 1) !== (currentPuzzle.solution[r][c] === 1)) {
                         isCorrect = false;
                         break;
                     }
@@ -299,96 +321,111 @@
             showModal(isCorrect ? 'Congratulations! You solved it correctly!' : 'Not quite right. Keep trying!');
         }
 
-        function resetPuzzle() {
-            renderPuzzle(currentPuzzle);
-        }
+        function resetPuzzle() { renderPuzzle(currentPuzzle); }
 
         function showModal(message) {
             modalText.textContent = message;
-            modal.style.display = 'flex';
+            messageModal.style.display = 'flex';
         }
 
         // --- AI PUZZLE GENERATION ---
         async function generateAIPuzzle() {
+            const apiKey = userApiKey || "";
+            if (apiKey === "" && typeof __initial_auth_token === 'undefined') {
+                 showModal("Please enter an API key to generate puzzles.");
+                 return;
+            }
+
             loadingModal.style.display = 'flex';
             const randomWord = inspirationWords[Math.floor(Math.random() * inspirationWords.length)];
             const size = parseInt(aiSizeSelect.value);
             const maxRetries = 3;
-            const minFillRatio = 0.20; // Require at least 20% of cells to be black
+            const minFillRatio = 0.20;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 loadingText.textContent = `AI is designing... (Attempt ${attempt}/${maxRetries})`;
-
-                // **ULTRA-PRECISE PROMPT**
                 const prompt = `Create a ${size}x${size} pixel art image inspired by '${randomWord}'. Key rules: 1. The image must be clear, recognizable, and centered. 2. The image must use the space well. 3. CRITICAL: The resulting nonogram puzzle must have a single, unique solution that can be found with logic, without guessing. 4. Output ONLY a valid JSON 2D array of 1s (black) and 0s (white). The array must be exactly ${size}x${size}. Do not include any other text or markdown.`;
 
                 try {
-                    let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
-                    const payload = { contents: chatHistory };
-                    const apiKey = ""; // Handled by environment
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     if (!response.ok) throw new Error(`API Error: ${response.status}`);
-
                     const result = await response.json();
-
-                    if (!result.candidates?.[0]?.content?.parts?.[0]) {
-                        throw new Error("Unexpected API response structure.");
-                    }
-
+                    if (!result.candidates?.[0]?.content?.parts?.[0]) throw new Error("Unexpected API response structure.");
                     let text = result.candidates[0].content.parts[0].text;
                     const jsonMatch = text.match(/\[[\s\S]*\]/);
                     if (!jsonMatch) throw new Error("No JSON array found in response.");
-
                     const solution = JSON.parse(jsonMatch[0]);
+                    if (!Array.isArray(solution) || solution.length !== size || !solution.every(row => Array.isArray(row) && row.length === size)) throw new Error(`Grid is not the correct size. Expected ${size}x${size}.`);
+                    const fillRatio = solution.flat().filter(cell => cell === 1).length / (size * size);
+                    if (fillRatio < minFillRatio) throw new Error(`Image is too empty (fill ratio: ${Math.round(fillRatio*100)}%). Retrying...`);
 
-                    // **QUALITY VALIDATION**
-                    if (!Array.isArray(solution) || solution.length !== size || !solution.every(row => Array.isArray(row) && row.length === size)) {
-                        throw new Error(`Grid is not the correct size. Expected ${size}x${size}.`);
-                    }
-
-                    const blackCells = solution.flat().filter(cell => cell === 1).length;
-                    const totalCells = size * size;
-                    const fillRatio = blackCells / totalCells;
-
-                    if (fillRatio < minFillRatio) {
-                         throw new Error(`Image is too empty (fill ratio: ${Math.round(fillRatio*100)}%). Retrying...`);
-                    }
-
-                    // If we get here, the puzzle is good!
-                    const newPuzzle = {
-                        name: `AI Inspiration: '${randomWord}' (${size}x${size})`,
-                        size: size,
-                        solution: solution
-                    };
+                    const newPuzzle = { name: `AI Inspiration: '${randomWord}' (${size}x${size})`, size: size, solution: solution };
                     renderPuzzle(newPuzzle);
                     loadingModal.style.display = 'none';
-                    return; // Exit the function successfully
-
+                    return;
                 } catch (error) {
                     console.error(`Attempt ${attempt} failed:`, error);
-                    if (attempt === maxRetries) {
-                        showModal("Sorry, the AI couldn't create a good puzzle after a few tries. Please try again.");
-                    }
+                    if (attempt === maxRetries) showModal("Sorry, the AI couldn't create a good puzzle after a few tries. Please try again.");
                 }
             }
-            // This part is reached only if all retries fail
             loadingModal.style.display = 'none';
         }
 
-        // --- EVENT LISTENERS ---
-        aiGenerateBtn.addEventListener('click', generateAIPuzzle);
-        checkBtn.addEventListener('click', checkSolution);
-        resetBtn.addEventListener('click', resetPuzzle);
-        modalCloseBtn.addEventListener('click', () => modal.style.display = 'none');
-        window.addEventListener('click', (event) => {
-            if (event.target == modal) modal.style.display = 'none';
+        function populateHelpModal() {
+            helpContent.innerHTML = `
+                <h2>About This Game</h2>
+                <p>This is an AI-Powered Nonogram puzzle game. Nonograms are picture logic puzzles in which cells in a grid must be colored or left blank according to numbers at the side of the grid to reveal a hidden picture.</p>
+                <h3>How to Play</h3>
+                <ul>
+                    <li>The numbers next to each row and column tell you the lengths of the runs of black squares in that line. For example, a clue of "2 3" means there is a run of 2 black squares, followed by a gap, followed by a run of 3 black squares.</li>
+                    <li>Use the <strong>Click Mode</strong> selector to switch between filling squares black or marking them with an 'X' to indicate they are white.</li>
+                    <li>Click and drag to fill multiple squares at once.</li>
+                    <li>Click <strong>Check</strong> to see if your solution is correct.</li>
+                </ul>
+                <h3>AI Puzzle Generation</h3>
+                <p>This app uses the Google Gemini AI to generate new and unique puzzles on demand.</p>
+                <ul>
+                    <li>Click the <strong>Generate with AI</strong> button to create a new puzzle.</li>
+                    <li>The AI is given a random word (like 'Apple' or 'Rocket') and instructed to create a recognizable image based on it.</li>
+                    <li>You can choose the puzzle size (5x5, 10x10, or 15x15) before generating.</li>
+                </ul>
+                <h3>API Key Setup</h3>
+                <p>The AI generation is powered by the Google AI API. To use this app, you will need a free API key from Google.</p>
+                <ol class="list-decimal list-inside">
+                    <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Google AI Studio</a> to get your key.</li>
+                    <li>Copy the key.</li>
+                    <li>Paste it into the "Google AI API Key" field in the app and click <strong>Save</strong>. The key will be saved in your browser's local storage for future use.</li>
+                </ol>
+            `;
+        }
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load API Key from local storage
+            userApiKey = localStorage.getItem('googleApiKey') || '';
+            if (userApiKey) {
+                apiKeyInput.value = userApiKey;
+            }
+
+            // Setup event listeners
+            aiGenerateBtn.addEventListener('click', generateAIPuzzle);
+            checkBtn.addEventListener('click', checkSolution);
+            resetBtn.addEventListener('click', resetPuzzle);
+            helpBtn.addEventListener('click', () => helpModal.style.display = 'flex');
+            saveKeyBtn.addEventListener('click', () => {
+                userApiKey = apiKeyInput.value;
+                localStorage.setItem('googleApiKey', userApiKey);
+                showModal('API Key saved!');
+            });
+            closeButtons.forEach(btn => btn.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            }));
+
+            // Initial setup
+            populateHelpModal();
+            renderPuzzle(initialPuzzle);
         });
 
         // Mouse & Touch Events
@@ -401,13 +438,10 @@
             if (isMouseDown) {
                 const touch = e.touches[0];
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                handleCellInteraction({ target: element });
+                if (element) handleCellInteraction({ target: element });
             }
         }, { passive: false });
         document.addEventListener('touchend', () => isMouseDown = false);
-
-        // --- INITIALIZATION ---
-        renderPuzzle(initialPuzzle);
 
     </script>
 </body>
